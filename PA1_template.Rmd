@@ -1,0 +1,95 @@
+---
+title: "Descriptive Analysis of Step Data Set"
+author: "dsal2020"
+date: "Tuesday, April 14, 2015"
+output: html_document
+---
+
+This script loads, formats and analyzes data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.[From Reproducible Research assignment description]
+
+
+Read in activity.csv, assuming it is in the current directory & format date column as date. 
+
+```{r}
+activity<-read.csv("activity.csv")
+activity$date<-as.Date(activity$date)
+
+```
+
+Aggregate the data by date (collapsing all interval data) 
+```{r}
+activity_bydate<-aggregate(activity$steps,by=list(activity$date),FUN=sum,na.rm=TRUE)
+colnames(activity_bydate)<-c("date","steps")
+```
+
+Plot a histogram with 10 break points for more granularity
+```{r}
+hist(activity_bydate$steps,breaks=10,main="Step totals per day",xlab="steps")
+```
+
+Calculate mean and median number of total steps taken in a day
+```{r}
+mu<-round(mean(activity_bydate$steps),2)
+med<-round(median(activity_bydate$steps),2)
+```
+The mean # of steps taken per day is `r mu` and the median is `r med`
+
+Aggregate dataset activity by interval, excluding NA's and averaging the rest of the values (collapsing dates). 
+```{r}
+activity_byint<-aggregate(activity$steps,by=list(activity$interval),FUN=mean,na.rm=TRUE)
+colnames(activity_byint)<-c("interval","steps")
+
+```
+plot a line plot and find the max interval
+```{r}
+plot(activity_byint$interval,activity_byint$steps,type="l",xlab="interval",ylab="steps",main="steps by interval")
+max<-activity_byint$interval[which(activity_byint$steps==max(activity_byint$steps))]
+```
+The 5-minute interval which produces the highest number of average steps is `r max`. 
+
+Calculate the na's in the dataset
+```{r}
+na_inset<-sum(is.na(activity$steps))
+```
+The number of NA's in the activity dataset is `r na_inset` 
+
+We are replacing the NA's with the mean from the step count in a modified dataset activity_noNA, then aggregate by day
+```{r}
+activity_noNA<-activity
+for(i in 1:nrow(activity_noNA)){
+      if (is.na(activity_noNA$steps[i])){
+            r<-activity_noNA$interval[i]
+            activity_noNA$steps[i]<-activity_byint$steps[which(activity_byint$interval==r)]
+      }
+}
+activity_bydate2<-aggregate(activity_noNA$steps,by=list(activity_noNA$date),FUN=sum,na.rm=TRUE)
+colnames(activity_bydate2)<-c("date","steps")
+hist(activity_bydate2$steps,breaks=10,main="Step totals per day",xlab="steps")
+mu_noNA<-round(mean(activity_bydate2$steps),2)
+med_noNA<-round(median(activity_bydate2$steps),2)
+```
+The mean when replacing NA's with mean interval data is `r mu_noNA` and the median is `r med_noNA`
+
+The interval data is re-aggregated from the non_NA data,split by weekday factor and then plotted with lattice plot.
+
+
+```{r}
+require(lattice)
+require(lubridate)
+activity_noNA$wday<-wday(activity_noNA$date)
+for (i in 1:nrow(activity_noNA)){
+      
+      if(activity_noNA$wday[i] ==7 | activity_noNA$wday[i]==1){
+            activity_noNA$wdfactor[i]<-"weekend"
+      }
+      else{
+            activity_noNA$wdfactor[i]<-"weekday"
+      }
+}
+activity_noNA$wdfactor<-as.factor(activity_noNA$wdfactor)
+activity_byint_noNA<-aggregate(activity_noNA$steps,by=list(activity_noNA$interval,activity_noNA$wdfactor),FUN=mean,na.rm=TRUE)
+colnames(activity_byint_noNA)<-c("interval","weekday","steps")
+
+xyplot(steps~interval|weekday,data=activity_byint_noNA, type="l")
+
+```
